@@ -2,7 +2,7 @@
 # 构建准备脚本 - 配置 Git 认证并修改 requirements.txt
 #
 # 此脚本会在安装依赖前修改 requirements.txt，注入 GitHub token
-# 然后安装依赖到 Vercel 指定的目录
+# 然后安装依赖，最后让 Vercel 的 Python builder 继续构建
 
 set -e
 
@@ -32,11 +32,29 @@ fi
 echo "📝 更新 requirements.txt，注入 GitHub token..."
 sed -i.tmp "s|git+https://github.com/XiaoTang-Life/micro-life-sim.git|git+https://${GITHUB_TOKEN}@github.com/XiaoTang-Life/micro-life-sim.git|g" requirements.txt
 
-# 修改 requirements.txt 后，让 Vercel 的 Python builder 继续安装
-# 恢复原始 requirements.txt 将在构建完成后进行（如果需要）
-# 注意：这里不恢复 requirements.txt，让 Vercel 使用修改后的版本
+# 检查 Python 版本
+PYTHON_VERSION=$(python3 --version 2>&1 | cut -d' ' -f2 | cut -d'.' -f1,2)
+echo "🐍 检测到 Python 版本: ${PYTHON_VERSION}"
 
-echo "✅ 构建环境准备完成"
-echo "📦 requirements.txt 已更新，包含 GitHub token"
-echo "   现在 Vercel Python builder 将使用更新后的 requirements.txt 安装依赖"
+# 确定安装目标目录（Vercel 使用的目录）
+INSTALL_TARGET="${VERCEL_PYTHON_VENDOR_PATH:-.vercel/python/py${PYTHON_VERSION}/_vendor}"
+echo "📦 安装依赖到: ${INSTALL_TARGET}"
+
+# 创建目标目录
+mkdir -p "${INSTALL_TARGET}"
+
+# 安装依赖（使用与 Vercel 相同的命令格式）
+echo "📥 开始安装依赖..."
+pip3 install --disable-pip-version-check --no-compile --no-cache-dir --target "${INSTALL_TARGET}" --upgrade -r requirements.txt || {
+    echo "⚠️ pip3 失败，尝试使用 pip..."
+    pip install --disable-pip-version-check --no-compile --no-cache-dir --target "${INSTALL_TARGET}" --upgrade -r requirements.txt
+}
+
+echo "✅ 依赖安装完成"
+
+# 恢复原始 requirements.txt（保持仓库干净）
+mv requirements.txt.original requirements.txt
+rm -f requirements.txt.tmp
+
+echo "✅ 构建准备完成，继续 Vercel 构建流程..."
 
