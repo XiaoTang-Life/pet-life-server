@@ -1,11 +1,18 @@
 """生命引擎适配器 - 将micro-life-sim的Life适配为宠物行为系统
 
 架构思路：
-- micro-life-sim 提供纯粹的生命引擎（Life类）
+- micro-life-sim 是独立的Python包，提供纯粹的生命引擎
 - LifeAdapter 负责：
-  1. 将内在状态（节律、能量）映射到外显表达（脉动、色彩、感受）
-  2. 管理多个设备的生命实例
-  3. 将微观生命的抽象状态转换为宠物系统可理解的数据
+  1. 导入并使用micro-life-sim的Life和ExpressionMapper
+  2. 将Life的内在状态映射到外显表达（脉动、色彩、感受）
+  3. 管理多个设备的生命实例
+  4. 将微观生命的抽象状态转换为宠物系统可理解的数据
+
+导入方式说明：
+- micro-life-sim的src目录通过sys.path添加，使其模块可直接导入
+- 这样可以保持micro-life-sim的内部模块结构（相对导入）
+- 同时避免修改micro-life-sim的内部代码以支持包的形式导入
+- 对于Vercel部署，micro-life-sim会通过pip安装，sys.path会自动配置
 """
 
 import sys
@@ -13,14 +20,15 @@ import os
 from datetime import datetime
 from typing import Dict, Any, Optional
 
-# 添加micro-life-sim的src路径
-# 使用绝对路径确保从任何地方都能正确导入
+# 添加micro-life-sim的src路径以支持本地开发
+# 在Vercel部署时，micro-life-sim会通过pip正确安装，这个路径添加不会有害
 _current_dir = os.path.dirname(os.path.abspath(__file__))
 _parent_dir = os.path.dirname(os.path.dirname(_current_dir))  # pet-life-server
 _grandparent_dir = os.path.dirname(_parent_dir)  # Deewooo
 MICRO_LIFE_SIM_PATH = os.path.join(_grandparent_dir, "micro-life-sim", "src")
 
-if MICRO_LIFE_SIM_PATH not in sys.path:
+# 仅在本地路径存在时添加（本地开发）
+if os.path.exists(MICRO_LIFE_SIM_PATH) and MICRO_LIFE_SIM_PATH not in sys.path:
     sys.path.insert(0, MICRO_LIFE_SIM_PATH)
 
 Life = None

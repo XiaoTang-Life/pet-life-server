@@ -3,5 +3,8 @@ uvicorn==0.24.0
 pydantic==2.5.0
 python-dotenv==1.0.0
 requests==2.31.0
-# 使用git URL安装micro-life-sim
+
+# micro-life-sim生命引擎
+# 使用git URL从GitHub安装最新版本
+# LifeAdapter会自动检测并使用该包
 git+https://github.com/XiaoTang-Life/micro-life-sim.git#egg=micro-life-sim
