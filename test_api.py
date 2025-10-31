@@ -4,9 +4,10 @@ API测试脚本 - 用来验证服务工作正常
 使用方法：
 1. 先启动服务: fastapi dev main.py
 2. 在另一个终端运行: python test_api.py
+
 """
 
-import requests
+import requests 
 import json
 from datetime import datetime
 
