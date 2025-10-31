@@ -3,3 +3,5 @@ uvicorn==0.24.0
 pydantic==2.5.0
 python-dotenv==1.0.0
 requests==2.31.0
+# 使用git URL安装micro-life-sim
+git+https://github.com/XiaoTang-Life/micro-life-sim.git#egg=micro-life-sim
