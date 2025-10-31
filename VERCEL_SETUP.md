@@ -32,28 +32,26 @@
 
 ### 3. 配置 Vercel 安装命令（重要！）
 
-**关键步骤**：需要在 **Install Command** 中运行构建脚本，而不是 Build Command。
+**关键步骤**：由于已移除 `builds` 配置，现在需要在 Vercel 项目设置中配置 Install Command。
 
-#### 推荐方式：在 Vercel 项目设置中配置 Install Command
+#### 在 Vercel 项目设置中配置 Install Command
 
 1. 进入 Vercel 项目：**Settings** → **General** → **Build & Development Settings**
-2. 找到 **Install Command** 字段（不是 Build Command！）
-3. 输入：`bash build.sh`
+2. 找到 **Install Command** 字段
+3. 输入：`bash prepare-build.sh`
 4. 保存设置
 
-**为什么使用 Install Command？**
-- Install Command 会在 `pip install -r requirements.txt` **之前**运行
-- 这样 Git 认证会在安装依赖前配置好
-- Build Command 会在 Python builder 运行**之后**执行，太晚了
+**重要说明**：
+- `vercel.json` 中已移除 `builds` 配置，改用新的 `functions` API
+- 这样项目设置中的 Install Command 可以正常生效
+- Install Command 会在 `pip install` **之前**运行，配置 Git 认证
 
-#### 备选方式：如果 Install Command 不可用
-
-如果 Vercel 项目设置中没有 Install Command 选项，可以尝试：
-
-1. 使用 **Build Command**：`bash build.sh`
-2. 但这样可能需要确保 Vercel 的 Python builder 仍然会运行 `pip install`
-
-**注意**：如果使用 Build Command，可能需要确保不会覆盖 Vercel 的默认构建流程。
+**工作原理**：
+1. `prepare-build.sh` 脚本会先运行
+2. 脚本配置 Git 认证并修改 `requirements.txt` 注入 token
+3. 脚本安装依赖到 Vercel 指定的目录
+4. Vercel 检测到依赖已安装，跳过自动安装步骤
+5. 继续构建 Python 函数
 
 ### 4. 验证配置
 

@@ -1,16 +1,11 @@
 {
   "version": 2,
-  "installCommand": "bash prepare-build.sh",
-  "builds": [
-    {
-      "src": "main.py",
-      "use": "@vercel/python",
-      "config": {
-        "maxLambdaSize": "50mb",
-        "runtime": "python3.11"
-      }
+  "functions": {
+    "main.py": {
+      "runtime": "python3.11",
+      "maxDuration": 10
     }
-  ],
+  },
   "routes": [
     {
       "src": "/(.*)",
