@@ -1,5 +1,6 @@
 {
   "version": 2,
+  "installCommand": "bash build.sh",
   "builds": [
     {
       "src": "main.py",
