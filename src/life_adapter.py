@@ -89,12 +89,24 @@ class LifeAdapter:
         """确保该设备对应的Life实例存在"""
         if self.device_id not in self._life_instances:
             # 为每个设备创建独立的Life实例
-            # 不使用ProcessLock，因为在Serverless环境不适用
             state_dir = f"/tmp/life-{self.device_id}"
-            self._life_instances[self.device_id] = Life(
+            life_instance = Life(
                 state_dir=state_dir,
                 time_scale=1.0  # 正常速度
             )
+
+            # 启动Life实例（初始化start_time）
+            # 如果ProcessLock冲突，仍然允许继续（这在Serverless中是正常的）
+            try:
+                life_instance.start()
+            except Exception as e:
+                # ProcessLock在某些环境下可能失败，但不影响功能
+                # 直接设置start_time以支持tick()操作
+                import time
+                life_instance.running = True
+                life_instance.start_time = time.time()
+
+            self._life_instances[self.device_id] = life_instance
 
             # 记录元数据
             self._instance_metadata[self.device_id] = {

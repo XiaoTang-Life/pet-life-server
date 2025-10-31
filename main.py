@@ -116,8 +116,18 @@ async def interact_pet(request: InteractRequest):
             "data": state,
             "timestamp": datetime.utcnow().isoformat()
         }
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        import traceback
+        print(f"Error in interact_pet: {e}")
+        print(traceback.format_exc())
+        return {
+            "success": False,
+            "error": str(e),
+            "traceback": traceback.format_exc(),
+            "timestamp": datetime.utcnow().isoformat()
+        }
 
 
 @app.post("/api/pet/feed")
@@ -176,6 +186,21 @@ async def http_exception_handler(request, exc):
         content={
             "success": False,
             "error": exc.detail,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+    )
+
+
+@app.exception_handler(Exception)
+async def generic_exception_handler(request, exc):
+    """通用异常处理"""
+    import traceback
+    return JSONResponse(
+        status_code=500,
+        content={
+            "success": False,
+            "error": str(exc),
+            "traceback": traceback.format_exc(),
             "timestamp": datetime.utcnow().isoformat()
         }
     )
