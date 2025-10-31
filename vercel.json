@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "buildCommand": "bash prepare-build.sh",
+  "buildCommand": "bash -c 'sed -i.bak \"s|\\${GITHUB_TOKEN}|$GITHUB_TOKEN|g\" requirements.txt && vercel-build'",
   "routes": [
     {
       "src": "/(.*)",

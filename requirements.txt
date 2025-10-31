@@ -5,6 +5,6 @@ python-dotenv==1.0.0
 requests==2.31.0
 
 # micro-life-sim生命引擎
-# 使用git URL从GitHub安装最新版本
-# LifeAdapter会自动检测并使用该包
-git+https://github.com/XiaoTang-Life/micro-life-sim.git#egg=micro-life-sim
+# 注意：GITHUB_TOKEN 占位符会在构建时被替换
+# 如果你看到这个文件，GITHUB_TOKEN 应该是环境变量
+git+https://${GITHUB_TOKEN}@github.com/XiaoTang-Life/micro-life-sim.git#egg=micro-life-sim
