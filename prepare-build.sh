@@ -32,29 +32,41 @@ fi
 echo "📝 更新 requirements.txt，注入 GitHub token..."
 sed -i.tmp "s|git+https://github.com/XiaoTang-Life/micro-life-sim.git|git+https://${GITHUB_TOKEN}@github.com/XiaoTang-Life/micro-life-sim.git|g" requirements.txt
 
-# 检查 Python 版本
-PYTHON_VERSION=$(python3 --version 2>&1 | cut -d' ' -f2 | cut -d'.' -f1,2)
-echo "🐍 检测到 Python 版本: ${PYTHON_VERSION}"
+# 检查 Python 版本（Vercel 使用 3.12）
+PYTHON_VERSION="3.12"
+echo "🐍 使用 Python 版本: ${PYTHON_VERSION}"
 
-# 确定安装目标目录（Vercel 使用的目录）
-INSTALL_TARGET="${VERCEL_PYTHON_VENDOR_PATH:-.vercel/python/py${PYTHON_VERSION}/_vendor}"
+# 检测 Vercel 的项目结构（根据日志，安装目标是 api/_vendor）
+if [ -d "api" ]; then
+    INSTALL_TARGET=".vercel/python/py${PYTHON_VERSION}/api/_vendor"
+else
+    INSTALL_TARGET=".vercel/python/py${PYTHON_VERSION}/_vendor"
+fi
+
 echo "📦 安装依赖到: ${INSTALL_TARGET}"
 
-# 创建目标目录
+# 创建目标目录（包括所有父目录）
 mkdir -p "${INSTALL_TARGET}"
 
-# 安装依赖（使用与 Vercel 相同的命令格式）
+# 安装依赖（使用与 Vercel 完全相同的命令格式）
 echo "📥 开始安装依赖..."
-pip3 install --disable-pip-version-check --no-compile --no-cache-dir --target "${INSTALL_TARGET}" --upgrade -r requirements.txt || {
-    echo "⚠️ pip3 失败，尝试使用 pip..."
-    pip install --disable-pip-version-check --no-compile --no-cache-dir --target "${INSTALL_TARGET}" --upgrade -r requirements.txt
-}
+pip3.12 install --disable-pip-version-check --no-compile --no-cache-dir --target "${INSTALL_TARGET}" --upgrade -r requirements.txt 2>&1
 
-echo "✅ 依赖安装完成"
+INSTALL_STATUS=$?
 
-# 恢复原始 requirements.txt（保持仓库干净）
-mv requirements.txt.original requirements.txt
-rm -f requirements.txt.tmp
-
-echo "✅ 构建准备完成，继续 Vercel 构建流程..."
+if [ $INSTALL_STATUS -eq 0 ]; then
+    echo "✅ 依赖安装成功"
+    
+    # 恢复原始 requirements.txt（保持仓库干净）
+    mv requirements.txt.original requirements.txt
+    rm -f requirements.txt.tmp
+    
+    echo "✅ 构建准备完成，依赖已安装到: ${INSTALL_TARGET}"
+else
+    echo "❌ 依赖安装失败，退出码: $INSTALL_STATUS"
+    # 恢复原始 requirements.txt
+    mv requirements.txt.original requirements.txt 2>/dev/null || true
+    rm -f requirements.txt.tmp
+    exit $INSTALL_STATUS
+fi
 
