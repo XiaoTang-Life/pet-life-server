@@ -33,11 +33,13 @@ if os.path.exists(MICRO_LIFE_SIM_PATH) and MICRO_LIFE_SIM_PATH not in sys.path:
 
 Life = None
 ExpressionMapper = None
+RedisStorage = None
 LIFE_ENGINE_AVAILABLE = False
 
 try:
     from life import Life
     from expression import ExpressionMapper
+    from core import RedisStorage
     LIFE_ENGINE_AVAILABLE = True
 except ImportError as e:
     print(f"Warning: Could not import micro-life-sim: {e}")
@@ -89,22 +91,17 @@ class LifeAdapter:
         """确保该设备对应的Life实例存在"""
         if self.device_id not in self._life_instances:
             # 为每个设备创建独立的Life实例
-            state_dir = f"/tmp/life-{self.device_id}"
+            # 优先使用Redis存储（Serverless环境）
+            backend = self._create_storage_backend()
+
             life_instance = Life(
-                state_dir=state_dir,
-                time_scale=1.0  # 正常速度
+                backend=backend,
+                time_scale=1.0,  # 正常速度
+                auto_flush=False  # 使用延迟刷盘优化性能
             )
 
-            # 启动Life实例（初始化start_time）
-            # 如果ProcessLock冲突，仍然允许继续（这在Serverless中是正常的）
-            try:
-                life_instance.start()
-            except Exception as e:
-                # ProcessLock在某些环境下可能失败，但不影响功能
-                # 直接设置start_time以支持tick()操作
-                import time
-                life_instance.running = True
-                life_instance.start_time = time.time()
+            # 启动Life实例（Redis模式下无需ProcessLock）
+            life_instance.start()
 
             self._life_instances[self.device_id] = life_instance
 
@@ -114,6 +111,27 @@ class LifeAdapter:
                 "pet_name": "小糖",
                 "device_id": self.device_id,
             }
+
+    def _create_storage_backend(self):
+        """创建存储后端（优先Redis，降级到文件）"""
+        # 尝试从环境变量获取Redis/Vercel KV配置
+        redis_url = os.getenv("KV_REST_API_URL") or os.getenv("REDIS_URL")
+
+        if redis_url and RedisStorage:
+            # 使用Redis存储（Serverless环境）
+            try:
+                return RedisStorage(
+                    redis_url=redis_url,
+                    key_prefix=f"life_{self.device_id}",  # 按设备隔离
+                    ttl=86400 * 7  # 7天过期
+                )
+            except Exception as e:
+                print(f"Warning: Redis init failed, falling back to file storage: {e}")
+
+        # 降级：使用文件存储（本地开发）
+        state_dir = f"/tmp/life-{self.device_id}"
+        from core import FileStorage
+        return FileStorage(state_dir)
 
     def get_life(self) -> Life:
         """获取当前设备的Life实例"""
@@ -293,6 +311,11 @@ class LifeAdapter:
         # 执行一个时间步的更新
         life.tick(dt=1.0)
 
+        # 延迟刷盘模式下，需要手动刷盘
+        # （这是为了优化Serverless环境的性能）
+        if not life.state_manager.auto_flush:
+            life.flush()
+
         return self.get_state()
 
     def reset(self) -> Dict[str, Any]:
@@ -306,6 +329,33 @@ class LifeAdapter:
             "pet_name": "小糖",
             "device_id": self.device_id,
         }
+
+        return self.get_state()
+
+    def catchup(self, hours: int = 24) -> Dict[str, Any]:
+        """
+        快速补偿（用于离线恢复）
+
+        当用户离线多小时后，执行快速补偿来计算宠物的状态变化
+        利用延迟刷盘的性能优势，批量执行大量tick操作
+
+        Args:
+            hours: 需要补偿的小时数（默认24小时）
+
+        Returns:
+            更新后的宠物状态
+        """
+        life = self.get_life()
+
+        # 批量执行tick（充分利用延迟刷盘的性能优势）
+        # 132倍性能提升意味着可以快速处理1440个tick
+        tick_count = hours
+        for _ in range(tick_count):
+            life.tick(dt=1.0)
+
+        # 一次性刷盘到存储
+        if not life.state_manager.auto_flush:
+            life.flush()
 
         return self.get_state()
 

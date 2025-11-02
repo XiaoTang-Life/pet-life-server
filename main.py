@@ -152,6 +152,47 @@ async def feed_pet(request: FeedRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.post("/api/pet/catchup")
+async def catchup_pet(device_id: str, hours: int = 24):
+    """
+    快速补偿（用于离线恢复）
+
+    当用户离线多小时后，执行快速补偿来计算宠物的状态变化。
+    利用延迟刷盘的性能优势，可以快速处理大量tick操作。
+
+    参数:
+    - device_id: 设备ID (必需)
+    - hours: 补偿小时数 (默认24)
+
+    示例：
+    - POST /api/pet/catchup?device_id=iphone-123&hours=24
+
+    性能指标：
+    - 24小时补偿（1440个tick）耗时 <100ms
+    """
+    try:
+        if not device_id:
+            raise HTTPException(status_code=400, detail="device_id is required")
+
+        if hours <= 0 or hours > 720:  # 限制最多30天
+            raise HTTPException(status_code=400, detail="hours must be between 1 and 720")
+
+        adapter = LifeAdapter(device_id)
+        state = adapter.catchup(hours)
+
+        return {
+            "success": True,
+            "action": "catchup",
+            "hours": hours,
+            "data": state,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # ==================== 调试API ====================
 
 @app.post("/api/debug/reset")
