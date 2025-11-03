@@ -17,6 +17,7 @@
 
 import sys
 import os
+import threading
 from datetime import datetime
 from typing import Dict, Any, Optional
 
@@ -48,34 +49,37 @@ except ImportError as e:
 
 class LifeAdapter:
     """
-    生命引擎适配器 - 使用真实的micro-life-sim引擎
-
+    生命引擎适配器 - 全局共享宠物模式
+    
+    架构变更：
+    - 所有用户共享同一个Life实例（全局单例）
+    - device_id仅用于追踪互动来源和日志记录
+    - 状态判断由客户端完成，Server只提供数值
+    
     职责：
-    1. 管理每个设备对应的Life实例
-    2. 提供周期性的状态更新
-    3. 将Life的内在状态映射到宠物的外显属性
-    4. 处理用户交互（喂食、互动等）
+    1. 管理全局唯一的Life实例
+    2. 提供全局共享的能量/饥饿/心情数值
+    3. 处理用户交互并影响全局状态
+    4. 记录互动来源以便分析
     """
 
-    # 宠物状态常量（从expression推导）
-    STATE_SLEEP = "sleep"
-    STATE_HUNGRY = "hungry"
-    STATE_PLAY = "play"
-    STATE_IDLE = "idle"
-    STATE_BORED = "bored"
-    STATE_GRUMPY = "grumpy"
-    STATE_SLEEPY = "sleepy"
-
-    # 生命实例管理
-    _life_instances: Dict[str, Any] = {}  # 使用Any避免Life未定义的问题
-    _instance_metadata: Dict[str, Dict[str, Any]] = {}
+    # 全局单例Life实例
+    _global_life: Optional[Any] = None  # 全局共享的Life实例
+    _global_life_lock = threading.Lock()  # 线程安全锁
+    _global_metadata: Dict[str, Any] = {}  # 全局元数据
+    
+    # 全局宠物ID（固定）
+    GLOBAL_PET_ID = "global_pet"
 
     def __init__(self, device_id: str):
         """
-        初始化设备对应的生命适配器
+        初始化生命适配器
+        
+        注意：device_id仅用于日志记录和追踪互动来源，
+        所有设备共享同一个Life实例
 
         Args:
-            device_id: 设备标识符
+            device_id: 设备标识符（用于追踪来源）
         """
         self.device_id = device_id
 
@@ -85,35 +89,51 @@ class LifeAdapter:
                 "Please ensure it's properly installed."
             )
 
-        self._ensure_life_exists()
+        self._ensure_global_life_exists()
 
-    def _ensure_life_exists(self):
-        """确保该设备对应的Life实例存在"""
-        if self.device_id not in self._life_instances:
-            # 为每个设备创建独立的Life实例
-            # 优先使用Redis存储（Serverless环境）
-            backend = self._create_storage_backend()
+    def _ensure_global_life_exists(self):
+        """
+        确保全局Life实例存在（线程安全）
+        
+        使用双重检查锁定模式（Double-Checked Locking）
+        确保多线程环境下只创建一次实例
+        """
+        if self.__class__._global_life is None:
+            with self.__class__._global_life_lock:
+                # Double-check：避免多线程重复创建
+                if self.__class__._global_life is None:
+                    # 创建全局存储后端
+                    backend = self._create_storage_backend()
 
-            life_instance = Life(
-                backend=backend,
-                time_scale=1.0,  # 正常速度
-                auto_flush=False  # 使用延迟刷盘优化性能
-            )
+                    # 创建全局Life实例
+                    life_instance = Life(
+                        backend=backend,
+                        time_scale=1.0,  # 正常速度
+                        auto_flush=False  # 使用延迟刷盘优化性能
+                    )
 
-            # 启动Life实例（Redis模式下无需ProcessLock）
-            life_instance.start()
+                    # 启动Life实例
+                    life_instance.start()
 
-            self._life_instances[self.device_id] = life_instance
+                    # 赋值给类变量
+                    self.__class__._global_life = life_instance
 
-            # 记录元数据
-            self._instance_metadata[self.device_id] = {
-                "created_at": datetime.utcnow().isoformat(),
-                "pet_name": "小糖",
-                "device_id": self.device_id,
-            }
+                    # 初始化全局元数据
+                    self.__class__._global_metadata = {
+                        "created_at": datetime.utcnow().isoformat(),
+                        "pet_name": "小糖",
+                        "global_pet_id": self.GLOBAL_PET_ID,
+                        "shared_mode": True,
+                    }
+                    
+                    print(f"✅ [LifeAdapter] 全局Life实例已创建: {self.GLOBAL_PET_ID}")
 
     def _create_storage_backend(self):
-        """创建存储后端（优先Redis，降级到文件）"""
+        """
+        创建全局存储后端（优先Redis，降级到文件）
+        
+        注意：使用固定的key_prefix确保所有设备访问同一份数据
+        """
         # 尝试从环境变量获取Redis配置
         # - REDIS_URL: Vercel Marketplace (Upstash) 或本地 Redis 实例
         # - KV_REST_API_URL: 旧版 Vercel KV (已弃用，但保留兼容性)
@@ -124,40 +144,48 @@ class LifeAdapter:
             try:
                 return RedisStorage(
                     redis_url=redis_url,
-                    key_prefix=f"life_{self.device_id}",  # 按设备隔离
-                    ttl=86400 * 7  # 7天过期
+                    key_prefix=f"life_{self.GLOBAL_PET_ID}",  # 全局固定前缀
+                    ttl=86400 * 30  # 30天过期（全局宠物需要更长保留）
                 )
             except Exception as e:
-                print(f"Warning: Redis init failed, falling back to file storage: {e}")
+                print(f"⚠️  Redis初始化失败，降级到文件存储: {e}")
 
         # 降级：使用文件存储（本地开发）
-        state_dir = f"/tmp/life-{self.device_id}"
+        state_dir = f"/tmp/life-{self.GLOBAL_PET_ID}"
         from core import FileStorage
         return FileStorage(state_dir)
 
     def get_life(self) -> Life:
-        """获取当前设备的Life实例"""
-        self._ensure_life_exists()
-        return self._life_instances[self.device_id]
+        """
+        获取全局Life实例
+        
+        Returns:
+            全局共享的Life实例
+        """
+        return self.__class__._global_life
 
     def get_state(self) -> Dict[str, Any]:
         """
-        获取宠物当前状态
+        获取全局宠物当前状态
+        
+        注意：返回的是全局共享的数值，不包含具体状态
+        具体状态由客户端根据数值自行判断
 
         Returns:
-            包含内在状态和外显表达的字典
+            包含全局共享数值的字典
         """
         life = self.get_life()
 
         # 获取Life的内在状态
         life_states = life.get_states()
         expression = life.get_expression()
-        metadata = self._instance_metadata[self.device_id]
+        metadata = self.__class__._global_metadata
 
         # 映射到宠物系统的状态格式
         pet_state = {
-            "device_id": self.device_id,
+            "device_id": self.device_id,  # 请求来源设备
             "pet_name": metadata["pet_name"],
+            "global_pet_id": self.GLOBAL_PET_ID,
 
             # 内在状态（来自Life引擎）
             "internal_state": {
@@ -176,7 +204,7 @@ class LifeAdapter:
                 "life_box": expression.get("life_box"),
             },
 
-            # 派生状态（用于简化的宠物UI）
+            # 简化数值（用于客户端决策）
             "simplified_state": self._derive_simplified_state(
                 life_states,
                 expression
@@ -193,32 +221,29 @@ class LifeAdapter:
         expression: Dict[str, Any]
     ) -> Dict[str, Any]:
         """
-        从Life的状态派生出简化的宠物状态
-
-        这是为了兼容产品文档中定义的宠物状态系统
+        从Life的状态派生出简化的数值
+        
+        架构变更：
+        - 只返回数值（energy/hunger/mood）
+        - 不再判断具体状态（由客户端决定）
+        - 客户端使用这些数值影响RefreshStrategy的概率
         """
-        # 简化的状态映射：从脉动频率和感受推导
-        pulse_rate = expression.get("pulse_rate", 60)
-        feeling = expression.get("feeling", "")
-
-        # 简化为三个维度的数值（0-100），用于产品UI
-        # 这里是示例实现，可以根据实际需求调整
+        # 提取三个核心数值（0-100）
         energy_value = self._extract_energy_value(life_states)
         hunger_value = self._extract_hunger_value(life_states)
         mood_value = self._extract_mood_value(expression)
 
-        # 根据数值判断当前状态
-        current_state = self._determine_state(
-            energy_value,
-            hunger_value,
-            mood_value
-        )
+        # 额外的表达信息（可选，用于丰富客户端体验）
+        pulse_rate = expression.get("pulse_rate", 60)
+        feeling = expression.get("feeling", "")
 
         return {
+            # 核心数值（客户端用于决策）
             "energy": energy_value,
             "hunger": hunger_value,
             "mood": mood_value,
-            "current_state": current_state,
+            
+            # 辅助信息（客户端可选使用）
             "pulse_rate": pulse_rate,
             "feeling": feeling,
         }
@@ -256,59 +281,37 @@ class LifeAdapter:
         mood_value = intensity_map.get(pulse_intensity, 50)
         return float(mood_value)
 
-    def _determine_state(
-        self,
-        energy: float,
-        hunger: float,
-        mood: float
-    ) -> str:
-        """根据数值判断宠物状态"""
-        # 优先级：饥饿 > 能量 > 心情
-        if hunger >= 70:
-            return self.STATE_HUNGRY
-
-        if energy <= 30:
-            if hunger >= 50:
-                return self.STATE_SLEEPY
-            return self.STATE_SLEEP
-
-        if mood <= 30:
-            return self.STATE_GRUMPY
-
-        if energy >= 70 and mood >= 70:
-            return self.STATE_PLAY
-
-        if energy <= 50:
-            return self.STATE_BORED
-
-        return self.STATE_IDLE
 
     def interact(self, action: str) -> Dict[str, Any]:
         """
-        处理用户互动
+        处理用户互动（影响全局状态）
+        
+        架构变更：
+        - 任何用户的互动都会影响全局宠物状态
+        - 记录互动来源以便分析
 
         Args:
             action: 互动类型（feed, greet, play等）
 
         Returns:
-            更新后的宠物状态
+            更新后的全局宠物状态
         """
         life = self.get_life()
 
-        # 这里可以根据action调用Life的不同操作
-        # 当前示例中，我们简单地执行一次tick
-        # 实际应用中可能需要修改Life类以支持交互反馈
+        # 记录互动日志（用于追踪和分析）
+        print(f"🎮 [Interact] device={self.device_id}, action={action}, timestamp={datetime.utcnow().isoformat()}")
 
+        # 根据action执行不同的操作
+        # TODO: 未来可以扩展Life引擎以支持更细粒度的交互
         if action == "feed":
-            # 简化实现：执行一次更新
-            # 实际应该增加能量值
-            pass
+            # 喂食：执行更新
+            print(f"  🍕 喂食操作 by {self.device_id}")
         elif action == "greet":
-            # 互动应该增加心情
-            pass
+            # 打招呼：增加互动
+            print(f"  👋 打招呼 by {self.device_id}")
         elif action == "play":
-            # 玩耍消耗能量，增加心情
-            pass
+            # 玩耍：消耗能量，增加心情
+            print(f"  🎾 玩耍 by {self.device_id}")
 
         # 执行一个时间步的更新
         life.tick(dt=1.0)
@@ -321,15 +324,23 @@ class LifeAdapter:
         return self.get_state()
 
     def reset(self) -> Dict[str, Any]:
-        """重置宠物状态"""
-        if self.device_id in self._life_instances:
-            self._life_instances[self.device_id].reset()
+        """
+        重置全局宠物状态
+        
+        注意：这会影响所有用户！仅用于调试
+        """
+        print(f"⚠️  [Reset] 全局宠物状态重置 by device={self.device_id}")
+        
+        life = self.get_life()
+        if life:
+            life.reset()
 
-        # 重新初始化元数据
-        self._instance_metadata[self.device_id] = {
+        # 重新初始化全局元数据
+        self.__class__._global_metadata = {
             "created_at": datetime.utcnow().isoformat(),
             "pet_name": "小糖",
-            "device_id": self.device_id,
+            "global_pet_id": self.GLOBAL_PET_ID,
+            "shared_mode": True,
         }
 
         return self.get_state()
@@ -362,9 +373,14 @@ class LifeAdapter:
         return self.get_state()
 
     @classmethod
-    def cleanup(cls, device_id: str):
-        """清理特定设备的Life实例"""
-        if device_id in cls._life_instances:
-            del cls._life_instances[device_id]
-        if device_id in cls._instance_metadata:
-            del cls._instance_metadata[device_id]
+    def cleanup_global(cls):
+        """
+        清理全局Life实例
+        
+        注意：这会影响所有用户！仅用于维护或测试
+        """
+        with cls._global_life_lock:
+            if cls._global_life:
+                print("⚠️  [Cleanup] 清理全局Life实例")
+                cls._global_life = None
+                cls._global_metadata = {}
