@@ -1,5 +1,12 @@
 # Redis 存储集成指南
 
+**阶段**: Phase 5 - Redis 存储集成
+**日期**: 2025-11-02
+**版本**: v0.4.0
+**状态**: ✅ 完成
+
+---
+
 ## 概述
 
 pet-life-server v2.0 集成了 micro-life-sim v0.4.0 的 Redis 存储后端，实现了完整的 Serverless 支持。
