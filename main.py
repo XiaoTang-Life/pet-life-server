@@ -8,6 +8,13 @@
     uvicorn main:app --reload
 """
 
+import os
+from dotenv import load_dotenv
+
+# 加载本地环境变量（.env 或 .env.local）
+load_dotenv()
+load_dotenv(".env.local", override=True)
+
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
