@@ -48,30 +48,84 @@
 
 ---
 
-## 🗂️ 项目结构与文档规则
+## 🗂️ 项目结构与文件组织规则
 
-### 代码结构
+### 代码结构（**重要** - 保持整洁）
 
 ```
 pet-life-server/
-├── src/
-│   ├── life_adapter.py          # Life 引擎适配层（Redis 支持）
-│   ├── models.py                # 数据模型定义
-│   └── ...
 │
-├── main.py                      # FastAPI 应用入口
-├── requirements.txt             # Python 依赖
-├── vercel.json                  # Vercel 部署配置
-├── test_integration.py          # 集成测试
+├── 📄 README.md                  # 项目主入口文档
+├── 📄 QUICKSTART.md              # 快速开始指南
+├── 📄 main.py                    # FastAPI 应用入口
+├── 📄 requirements.txt           # Python 依赖
+├── 📄 vercel.json                # Vercel 部署配置
 │
-├── docs/                        # 📋 文档目录规则见下方
-├── api/                         # API 路由定义
-└── README.md                    # 本文件
+├── 📂 src/                       # 源代码
+│   ├── life_adapter.py           # Life 引擎适配层（Redis 支持）
+│   ├── models.py                 # 数据模型定义
+│   └── pet_adapter.py            # 宠物适配器
+│
+├── 📂 api/                       # Vercel API 路由
+│   ├── __init__.py
+│   └── index.py                  # API 入口
+│
+├── 📂 docs/                      # 📚 所有项目文档（详见下方规则）
+│   ├── README.md                 # 文档导航中心 ⭐
+│   ├── guides/                   # 📖 使用指南
+│   │   ├── integration-guide.md  # 集成指南
+│   │   ├── vercel-setup.md       # Vercel 部署
+│   │   └── upstash-setup.md      # Upstash 安装
+│   ├── references/               # 📝 参考文档
+│   │   ├── upstash-quick-reference.md
+│   │   └── upstash-integration-summary.md
+│   ├── Phase-N-[功能名]/         # 阶段级文档
+│   ├── 整体重构总结.md           # 项目级总结
+│   └── 验证测试报告.md           # 项目级测试报告
+│
+├── 📂 tests/                     # 🧪 所有测试脚本
+│   ├── test_api.py               # API 测试
+│   ├── test_integration.py       # 集成测试
+│   ├── test_redis_connection.py  # Redis 连接测试
+│   └── test_vercel.py            # Vercel 部署测试
+│
+└── 📂 scripts/                   # 🔧 构建和部署脚本
+    ├── build.sh                  # 构建脚本
+    ├── build-alternative.sh      # 替代构建方案
+    ├── install-deps.sh           # 安装依赖
+    └── prepare-build.sh          # 准备构建
 ```
 
-### 📋 文档目录规则（**重要**）
+### 📋 文件组织规则（**强制执行**）
 
-这是为了保持项目长期可维护性和一致性的**强制规范**：
+> ⚠️ **重要**：为了保持项目整洁，所有新建文件必须遵循规则。完整说明见：[FILE_ORGANIZATION_RULES.md](FILE_ORGANIZATION_RULES.md)
+
+#### **✅ 根目录规则**
+
+只允许放以下文件在根目录：
+
+| 文件类型 | 允许的文件 | 说明 |
+|---------|----------|------|
+| **代码** | `main.py` | FastAPI 应用 |
+| **配置** | `requirements.txt`, `vercel.json` | 项目配置 |
+| **文档** | `README.md`, `QUICKSTART.md` | 仅这两个 |
+
+❌ **禁止放在根目录**：
+- ❌ 其他文档 → 移到 `docs/guides/` 或 `docs/references/`
+- ❌ 测试脚本 → 移到 `tests/`
+- ❌ 工具脚本 → 移到 `scripts/`
+
+#### **📂 目录快速查询**
+
+查看新文件应该放在哪里：
+
+| 文件类型 | 目录 | 示例 |
+|---------|------|------|
+| 使用指南/教程 | `docs/guides/` | `integration-guide.md` |
+| 参考文档/总结 | `docs/references/` | `upstash-quick-reference.md` |
+| 阶段文档 | `docs/Phase-N-[功能]/` | Phase-6-用户认证/ |
+| 测试脚本 | `tests/` | `test_api.py` |
+| 构建脚本 | `scripts/` | `build.sh` |
 
 #### **文档分层结构**
 
