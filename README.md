@@ -32,7 +32,7 @@
 
 - 🐾 **实时宠物状态管理** - 通过微观生命模型计算
 - 📱 **多设备支持** - 设备级别的独立状态管理
-- 🌐 **云端数据同步** - Vercel KV 存储，Redis 兼容
+- 🌐 **云端数据同步** - Vercel Marketplace (Upstash) Redis 存储
 - ⚡ **高性能计算** - 延迟刷盘优化，132.6 倍性能提升
 - 🔄 **跨设备恢复** - 快速离线补偿（24h < 10ms）
 
@@ -41,8 +41,8 @@
 | 项目 | 信息 | 备注 |
 |------|------|------|
 | **项目状态** | 🟢 C 纪元生产系统 | 完整重构完成 |
-| **技术栈** | Python + FastAPI + Vercel KV | 云端优先 |
-| **存储方案** | Redis (Vercel KV) / FileStorage | 自动选择 |
+| **技术栈** | Python + FastAPI + Vercel Marketplace | 云端优先 |
+| **存储方案** | Redis (Upstash/Marketplace) / FileStorage | 自动选择 |
 | **性能** | 132.6 倍提升 | 关键优化完成 |
 | **部署地址** | https://pet-life-server.vercel.app | 线上运行中 |
 

@@ -1,9 +1,12 @@
 # Redis 存储集成指南
 
 **阶段**: Phase 5 - Redis 存储集成
-**日期**: 2025-11-02
+**日期**: 2025-11-02 (更新: 2025-11-03)
 **版本**: v0.4.0
 **状态**: ✅ 完成
+**更新**: Vercel Marketplace 集成指南
+
+> **重要**: 自 2025 年 6 月 9 日起，Vercel 官方 KV 服务已被 Vercel Marketplace 的存储集成所替代。本指南已更新为使用 Upstash（通过 Vercel Marketplace）的新方法。
 
 ---
 
@@ -12,7 +15,7 @@
 pet-life-server v2.0 集成了 micro-life-sim v0.4.0 的 Redis 存储后端，实现了完整的 Serverless 支持。
 
 **关键改进**：
-- ✅ Vercel KV 原生支持
+- ✅ Vercel Marketplace 集成（Upstash）
 - ✅ 延迟刷盘性能优化（132倍）
 - ✅ 自动降级到文件存储（本地开发）
 - ✅ 按设备隔离的 Redis 键空间
@@ -31,25 +34,29 @@ pip install -r requirements.txt
 python main.py
 ```
 
-### Vercel 部署（Redis/Vercel KV）
+### Vercel 部署（Vercel Marketplace - Upstash）
 
-#### 1. 创建 Vercel KV 存储
+> **背景**: Vercel KV 服务已在 2025-06-09 被 Vercel Marketplace 集成所替代。现在需要通过 Marketplace 使用第三方 Redis 提供商，推荐使用 Upstash。
+
+#### 1. 通过 Vercel Marketplace 添加 Upstash
 
 在 Vercel 控制台：
-1. 进入 "Storage" → "KV"
-2. 创建新的 KV 存储
-3. 连接到你的项目
-4. 自动生成 `KV_REST_API_URL` 环境变量
+1. 进入项目 → "Storage" 或 "Integrations"
+2. 在 Marketplace 中搜索 "Upstash"
+3. 点击 "Add" 或 "Connect"
+4. 选择免费层或付费计划
+5. 授权并连接到项目
+6. 自动生成 Redis 连接环境变量
 
 #### 2. 环境变量
 
-Vercel 会自动注入：
+Vercel 会自动注入 Upstash 的环境变量：
 ```
-KV_REST_API_URL=https://...
-KV_REST_API_TOKEN=...
+REDIS_URL=redis://default:[password]@[host]:[port]
+# 或其他 Upstash 提供的环境变量名称
 ```
 
-无需额外配置！
+如果环境变量名称不同，可在 Vercel 项目设置中重命名或查看正确的变量名。
 
 #### 3. 部署
 
@@ -59,7 +66,17 @@ git push origin main
 # 1. 检测 requirements.txt
 # 2. 安装 redis>=5.0.0
 # 3. 安装 micro-life-sim v0.4.0
-# 4. 使用 KV_REST_API_URL 作为 Redis 连接
+# 4. 使用 REDIS_URL 作为 Redis 连接
+# 5. 自动连接到 Upstash Redis 实例
+```
+
+#### 4. 验证部署
+
+部署完成后，检查日志确保 Redis 连接成功：
+```bash
+vercel logs --follow
+# 应该看到: "Using RedisStorage with Upstash"
+# 或类似的成功连接信息
 ```
 
 ---
@@ -76,15 +93,18 @@ git push origin main
            ▼
 ┌─────────────────────────────┐
 │  检查环境变量                 │
-│  KV_REST_API_URL / REDIS_URL│
+│  (Marketplace 集成/本地配置) │
+│  REDIS_URL / 其他环境变量     │
 └──┬──────────────────────────┘
    │
-   ├─ 有Redis配置?
+   ├─ 有 Redis 配置?
    │  ├─ 是 → 使用 RedisStorage
-   │  │        (Serverless环境)
+   │  │        ├─ Vercel Marketplace (Upstash)
+   │  │        ├─ 本地 Redis 实例
+   │  │        └─ 其他 Redis 兼容服务
    │  │
    │  └─ 否 → 使用 FileStorage
-   │           (本地开发)
+   │           (本地开发环境)
    │
    └─ 无论哪种，都通过
       统一的 Storage API
@@ -238,15 +258,28 @@ python main.py
 ### 问题：Vercel 部署失败
 
 **检查清单**：
-1. ✅ 是否创建了 Vercel KV？
-2. ✅ KV 是否连接到项目？
-3. ✅ requirements.txt 是否包含 `redis>=5.0.0`？
-4. ✅ 是否推送了最新的代码？
+1. ✅ 是否通过 Vercel Marketplace 添加了 Upstash？
+2. ✅ Upstash 是否连接到项目？
+3. ✅ 环境变量是否正确注入（REDIS_URL 或自定义变量）？
+4. ✅ requirements.txt 是否包含 `redis>=5.0.0`？
+5. ✅ 是否推送了最新的代码？
 
 ```bash
 # 检查部署日志
 vercel logs --follow
+
+# 查看项目环境变量
+vercel env list
+
+# 检查 Upstash 连接是否成功
+vercel env pull .env.local
+# 查看 .env.local 中的 REDIS_URL
 ```
+
+**常见问题**：
+- 如果看到 "Redis connection failed"，检查 Upstash 实例是否在线
+- 如果环境变量名不是 REDIS_URL，需要在 main.py 中修改变量名
+- 确保没有 IP 白名单限制（Upstash 面向公网时可能需要配置）
 
 ### 问题：性能低于预期
 
@@ -275,8 +308,14 @@ life.flush()  # 1次Redis写
 # 本地 Redis
 redis-cli keys "life_*"
 
-# Vercel KV（通过控制台）
-vercel kv list
+# Upstash (通过 Web 控制台)
+# 1. 访问 console.upstash.com
+# 2. 选择你的 Redis 实例
+# 3. 使用 Data Browser 查看键
+# 4. 或使用 CLI 选项执行命令：keys life_*
+
+# 或使用 Upstash CLI (如果已安装)
+upstash redis list-keys --prefix "life_"
 ```
 
 ### 性能指标
@@ -317,7 +356,8 @@ print(f"Unsaved changes: {dirty_count} systems")
 | micro-life-sim | 0.4.0 | 多存储后端支持 |
 | FastAPI | 0.104.1 | Web 框架 |
 | redis | 5.0.0+ | Redis 客户端 |
-| Vercel KV | latest | Serverless 存储 |
+| Vercel Marketplace | latest | Upstash Redis 集成 |
+| Upstash | 任意 | Redis 存储服务商 |
 
 ---
 
@@ -342,13 +382,21 @@ print(f"Unsaved changes: {dirty_count} systems")
 
 ## 参考资源
 
+### 项目文档
 - [micro-life-sim v0.4.0](../../../micro-life-sim/docs/第C纪：脉动/Phase1-3完成总结.md)
 - [Redis 存储方案](../../../micro-life-sim/docs/第C纪：脉动/Redis存储后端技术方案.md)
-- [Vercel KV 文档](https://vercel.com/docs/storage/vercel-kv)
+
+### 官方文档
+- [Vercel Marketplace 文档](https://vercel.com/marketplace)
+- [Upstash Redis 文档](https://upstash.com/docs)
+- [Upstash 与 Vercel 集成指南](https://upstash.com/docs/redis/features/integrations/vercel)
 - [FastAPI 文档](https://fastapi.tiangolo.com/)
+
+### 迁移指南
+- [从 Vercel KV 到 Vercel Marketplace 迁移](https://vercel.com/docs/storage)（需要查阅最新官方文档）
 
 ---
 
-**最后更新**: 2025-11-02
+**最后更新**: 2025-11-03
 **作者**: Claude Code
-**状态**: ✅ 生产环境就绪
+**状态**: ✅ 生产环境就绪（已更新 Marketplace 集成）

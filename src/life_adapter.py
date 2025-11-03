@@ -114,8 +114,10 @@ class LifeAdapter:
 
     def _create_storage_backend(self):
         """创建存储后端（优先Redis，降级到文件）"""
-        # 尝试从环境变量获取Redis/Vercel KV配置
-        redis_url = os.getenv("KV_REST_API_URL") or os.getenv("REDIS_URL")
+        # 尝试从环境变量获取Redis配置
+        # - REDIS_URL: Vercel Marketplace (Upstash) 或本地 Redis 实例
+        # - KV_REST_API_URL: 旧版 Vercel KV (已弃用，但保留兼容性)
+        redis_url = os.getenv("REDIS_URL") or os.getenv("KV_REST_API_URL")
 
         if redis_url and RedisStorage:
             # 使用Redis存储（Serverless环境）
