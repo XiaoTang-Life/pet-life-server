@@ -18,8 +18,13 @@
 import sys
 import os
 import threading
+import logging
 from datetime import datetime
 from typing import Dict, Any, Optional
+
+# 配置logging以便在Vercel看到日志
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # 添加micro-life-sim的src路径以支持本地开发
 # 在Vercel部署时，micro-life-sim会通过pip正确安装，这个路径添加不会有害
@@ -43,7 +48,8 @@ try:
     from core import RedisStorage
     LIFE_ENGINE_AVAILABLE = True
 except ImportError as e:
-    print(f"Warning: Could not import micro-life-sim: {e}")
+    import logging
+    logging.warning(f"Warning: Could not import micro-life-sim: {e}")
     LIFE_ENGINE_AVAILABLE = False
 
 
@@ -81,19 +87,19 @@ class LifeAdapter:
         Args:
             device_id: 设备标识符（用于追踪来源）
         """
-        print(f"🔧 [LifeAdapter] 初始化开始, device_id={device_id}")
+        logger.info(f"🔧 [LifeAdapter] 初始化开始, device_id={device_id}")
         self.device_id = device_id
 
         if not LIFE_ENGINE_AVAILABLE:
-            print("❌ [LifeAdapter] Life引擎不可用")
+            logger.error("❌ [LifeAdapter] Life引擎不可用")
             raise RuntimeError(
                 "micro-life-sim engine not available. "
                 "Please ensure it's properly installed."
             )
 
-        print(f"✅ [LifeAdapter] Life引擎可用，开始确保全局实例存在")
+        logger.info(f"✅ [LifeAdapter] Life引擎可用，开始确保全局实例存在")
         self._ensure_global_life_exists()
-        print(f"✅ [LifeAdapter] 初始化完成, device_id={device_id}")
+        logger.info(f"✅ [LifeAdapter] 初始化完成, device_id={device_id}")
 
     def _ensure_global_life_exists(self):
         """
@@ -130,7 +136,7 @@ class LifeAdapter:
                         "shared_mode": True,
                     }
                     
-                    print(f"✅ [LifeAdapter] 全局Life实例已创建: {self.GLOBAL_PET_ID}")
+                    logger.info(f"✅ [LifeAdapter] 全局Life实例已创建: {self.GLOBAL_PET_ID}")
 
     def _create_storage_backend(self):
         """
@@ -138,36 +144,36 @@ class LifeAdapter:
         
         注意：使用固定的key_prefix确保所有设备访问同一份数据
         """
-        print("🔍 [Storage] 开始创建存储后端...")
+        logger.info("🔍 [Storage] 开始创建存储后端...")
         
         # 尝试从环境变量获取Redis配置
         # - REDIS_URL: Vercel Marketplace (Upstash) 或本地 Redis 实例
         # - KV_REST_API_URL: 旧版 Vercel KV (已弃用，但保留兼容性)
         redis_url = os.getenv("REDIS_URL") or os.getenv("KV_REST_API_URL")
         
-        print(f"🔍 [Storage] REDIS_URL={'存在' if os.getenv('REDIS_URL') else '不存在'}")
-        print(f"🔍 [Storage] KV_REST_API_URL={'存在' if os.getenv('KV_REST_API_URL') else '不存在'}")
-        print(f"🔍 [Storage] RedisStorage={'可用' if RedisStorage else '不可用'}")
+        logger.info(f"🔍 [Storage] REDIS_URL={'存在' if os.getenv('REDIS_URL') else '不存在'}")
+        logger.info(f"🔍 [Storage] KV_REST_API_URL={'存在' if os.getenv('KV_REST_API_URL') else '不存在'}")
+        logger.info(f"🔍 [Storage] RedisStorage={'可用' if RedisStorage else '不可用'}")
 
         if redis_url and RedisStorage:
             # 使用Redis存储（Serverless环境）
-            print(f"✅ [Storage] 使用Redis存储，key_prefix=life_{self.GLOBAL_PET_ID}")
+            logger.info(f"✅ [Storage] 使用Redis存储，key_prefix=life_{self.GLOBAL_PET_ID}")
             try:
                 backend = RedisStorage(
                     redis_url=redis_url,
                     key_prefix=f"life_{self.GLOBAL_PET_ID}",  # 全局固定前缀
                     ttl=86400 * 30  # 30天过期（全局宠物需要更长保留）
                 )
-                print("✅ [Storage] Redis存储初始化成功")
+                logger.info("✅ [Storage] Redis存储初始化成功")
                 return backend
             except Exception as e:
-                print(f"⚠️  [Storage] Redis初始化失败，降级到文件存储: {e}")
+                logger.warning(f"⚠️  [Storage] Redis初始化失败，降级到文件存储: {e}")
                 import traceback
-                print(f"⚠️  [Storage] 错误详情: {traceback.format_exc()}")
+                logger.warning(f"⚠️  [Storage] 错误详情: {traceback.format_exc()}")
 
         # 降级：使用文件存储（本地开发）
         state_dir = f"/tmp/life-{self.GLOBAL_PET_ID}"
-        print(f"⚠️  [Storage] 使用文件存储（降级模式），目录={state_dir}")
+        logger.warning(f"⚠️  [Storage] 使用文件存储（降级模式），目录={state_dir}")
         from core import FileStorage
         return FileStorage(state_dir)
 
@@ -315,19 +321,19 @@ class LifeAdapter:
         life = self.get_life()
 
         # 记录互动日志（用于追踪和分析）
-        print(f"🎮 [Interact] device={self.device_id}, action={action}, timestamp={datetime.utcnow().isoformat()}")
+        logger.info(f"🎮 [Interact] device={self.device_id}, action={action}, timestamp={datetime.utcnow().isoformat()}")
 
         # 根据action执行不同的操作
         # TODO: 未来可以扩展Life引擎以支持更细粒度的交互
         if action == "feed":
             # 喂食：执行更新
-            print(f"  🍕 喂食操作 by {self.device_id}")
+            logger.info(f"  🍕 喂食操作 by {self.device_id}")
         elif action == "greet":
             # 打招呼：增加互动
-            print(f"  👋 打招呼 by {self.device_id}")
+            logger.info(f"  👋 打招呼 by {self.device_id}")
         elif action == "play":
             # 玩耍：消耗能量，增加心情
-            print(f"  🎾 玩耍 by {self.device_id}")
+            logger.info(f"  🎾 玩耍 by {self.device_id}")
 
         # 执行一个时间步的更新
         life.tick(dt=1.0)
@@ -345,7 +351,7 @@ class LifeAdapter:
         
         注意：这会影响所有用户！仅用于调试
         """
-        print(f"⚠️  [Reset] 全局宠物状态重置 by device={self.device_id}")
+        logger.warning(f"⚠️  [Reset] 全局宠物状态重置 by device={self.device_id}")
         
         life = self.get_life()
         if life:
@@ -397,6 +403,6 @@ class LifeAdapter:
         """
         with cls._global_life_lock:
             if cls._global_life:
-                print("⚠️  [Cleanup] 清理全局Life实例")
+                logger.warning("⚠️  [Cleanup] 清理全局Life实例")
                 cls._global_life = None
                 cls._global_metadata = {}
