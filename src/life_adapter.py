@@ -203,9 +203,10 @@ class LifeAdapter:
                 import traceback
                 logger.warning(f"⚠️  [Storage] 错误详情: {traceback.format_exc()}")
 
-        # 降级：使用文件存储（本地开发）
+        # 降级：使用文件存储（本地开发或Serverless临时存储）
         state_dir = f"/tmp/life-{self.GLOBAL_PET_ID}"
-        logger.warning(f"⚠️  [Storage] 使用文件存储（降级模式），目录={state_dir}")
+        logger.info(f"📁 [Storage] 使用文件存储，目录={state_dir}")
+        logger.info(f"ℹ️  [Storage] 注意：Serverless环境中文件存储是临时的，实例重启后会清空")
         from core import FileStorage
         return FileStorage(state_dir)
 
