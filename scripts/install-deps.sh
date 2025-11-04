@@ -28,7 +28,7 @@ cp requirements.txt requirements.txt.original
 
 # 修改 requirements.txt 中的 GitHub URL，注入 token
 # 将 git+https://github.com/... 替换为 git+https://TOKEN@github.com/...
-sed -i.bak "s|git+https://github.com/XiaoTang-Life/micro-life-sim.git|git+https://${GITHUB_TOKEN}@github.com/XiaoTang-Life/micro-life-sim.git|g" requirements.txt
+sed -i.bak "s|git+https://github.com/DeeWooo/micro-life-sim.git|git+https://${GITHUB_TOKEN}@github.com/DeeWooo/micro-life-sim.git|g" requirements.txt
 
 echo "开始安装依赖..."
 pip install -r requirements.txt

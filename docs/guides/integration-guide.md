@@ -36,7 +36,7 @@ pet-life-server通过以下方式集成micro-life-sim生命引擎：
 ### requirements.txt
 
 ```
-git+https://github.com/XiaoTang-Life/micro-life-sim.git#egg=micro-life-sim
+git+https://github.com/DeeWooo/micro-life-sim.git#egg=micro-life-sim
 ```
 
 **说明：**

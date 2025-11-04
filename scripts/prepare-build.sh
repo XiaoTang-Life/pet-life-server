@@ -30,7 +30,7 @@ fi
 
 # 修改 requirements.txt，注入 token
 echo "📝 更新 requirements.txt，注入 GitHub token..."
-sed -i.tmp "s|git+https://github.com/XiaoTang-Life/micro-life-sim.git|git+https://${GITHUB_TOKEN}@github.com/XiaoTang-Life/micro-life-sim.git|g" requirements.txt
+sed -i.tmp "s|git+https://github.com/DeeWooo/micro-life-sim.git|git+https://${GITHUB_TOKEN}@github.com/DeeWooo/micro-life-sim.git|g" requirements.txt
 
 # 检查 Python 版本（Vercel 使用 3.12）
 PYTHON_VERSION="3.12"

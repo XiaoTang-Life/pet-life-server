@@ -19,7 +19,7 @@ cp requirements.txt requirements.txt.original
 
 # 修改 requirements.txt，注入 token
 echo "📝 更新 requirements.txt，注入 GitHub token..."
-sed -i.tmp "s|git+https://github.com/XiaoTang-Life/micro-life-sim.git|git+https://${GITHUB_TOKEN}@github.com/XiaoTang-Life/micro-life-sim.git|g" requirements.txt
+sed -i.tmp "s|git+https://github.com/DeeWooo/micro-life-sim.git|git+https://${GITHUB_TOKEN}@github.com/DeeWooo/micro-life-sim.git|g" requirements.txt
 
 # 配置 Git credential helper（双重保险）
 git config --global credential.helper store
