@@ -47,9 +47,17 @@ try:
     from expression import ExpressionMapper
     from core import RedisStorage
     LIFE_ENGINE_AVAILABLE = True
+    logger.info("✅ micro-life-sim 导入成功")
 except ImportError as e:
-    import logging
-    logging.warning(f"Warning: Could not import micro-life-sim: {e}")
+    logger.error(f"❌ 导入 micro-life-sim 失败: {e}")
+    logger.error(f"   sys.path: {sys.path[:3]}")  # 只显示前3个路径
+    # 尝试列出已安装的包
+    try:
+        import pkg_resources
+        installed_packages = [pkg.key for pkg in pkg_resources.working_set if 'micro' in pkg.key or 'life' in pkg.key]
+        logger.error(f"   已安装的相关包: {installed_packages}")
+    except:
+        pass
     LIFE_ENGINE_AVAILABLE = False
 
 
