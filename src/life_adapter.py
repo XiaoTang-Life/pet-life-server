@@ -43,22 +43,46 @@ RedisStorage = None
 LIFE_ENGINE_AVAILABLE = False
 
 try:
+    # 尝试方式1：直接导入（本地开发或正确配置的pip安装）
     from life import Life
     from expression import ExpressionMapper
     from core import RedisStorage
     LIFE_ENGINE_AVAILABLE = True
-    logger.info("✅ micro-life-sim 导入成功")
-except ImportError as e:
-    logger.error(f"❌ 导入 micro-life-sim 失败: {e}")
-    logger.error(f"   sys.path: {sys.path[:3]}")  # 只显示前3个路径
-    # 尝试列出已安装的包
+    logger.info("✅ micro-life-sim 导入成功（方式1：直接导入）")
+except ImportError as e1:
+    logger.warning(f"⚠️  方式1失败: {e1}")
     try:
-        import pkg_resources
-        installed_packages = [pkg.key for pkg in pkg_resources.working_set if 'micro' in pkg.key or 'life' in pkg.key]
-        logger.error(f"   已安装的相关包: {installed_packages}")
-    except:
-        pass
-    LIFE_ENGINE_AVAILABLE = False
+        # 尝试方式2：从 micro_life_sim 包导入
+        import sys
+        import importlib.util
+        
+        # 查找 micro-life-sim 的安装位置
+        spec = importlib.util.find_spec("micro_life_sim")
+        if spec and spec.origin:
+            import os
+            package_dir = os.path.dirname(spec.origin)
+            parent_dir = os.path.dirname(package_dir)  # site-packages
+            
+            # 将 micro-life-sim 的实际代码目录加入 sys.path
+            # 因为它的结构是扁平的，模块直接在 site-packages 下
+            if parent_dir not in sys.path:
+                sys.path.insert(0, parent_dir)
+            
+            logger.info(f"   找到 micro-life-sim 位置: {parent_dir}")
+            
+            # 再次尝试导入
+            from life import Life
+            from expression import ExpressionMapper
+            from core import RedisStorage
+            LIFE_ENGINE_AVAILABLE = True
+            logger.info("✅ micro-life-sim 导入成功（方式2：手动添加路径）")
+        else:
+            raise ImportError("找不到 micro_life_sim 包")
+    except ImportError as e2:
+        logger.error(f"❌ 所有导入方式都失败")
+        logger.error(f"   方式1错误: {e1}")
+        logger.error(f"   方式2错误: {e2}")
+        LIFE_ENGINE_AVAILABLE = False
 
 
 class LifeAdapter:
