@@ -334,7 +334,7 @@ class LifeAdapter:
         # 提取三个核心数值（0-100）
         energy_value = self._extract_energy_value(life_states)
         hunger_value = self._extract_hunger_value(life_states)
-        mood_value = self._extract_mood_value(expression)
+        mood_value = self._extract_mood_value(expression, life_states)
 
         # 额外的表达信息（可选，用于丰富客户端体验）
         pulse_rate = expression.get("pulse_rate", 60)
@@ -379,11 +379,17 @@ class LifeAdapter:
         logger.info(f"   📊 [Extract] energy={energy_value}, hunger计算值={hunger_value}")
         return max(0, min(100, float(hunger_value)))
 
-    def _extract_mood_value(self, expression: Dict) -> float:
-        """从表达信息提取心情值（0-100）"""
-        # 脉动强度可以用来反映心情
+    def _extract_mood_value(self, expression: Dict, life_states: Dict) -> float:
+        """
+        从表达信息和Life状态综合提取心情值（0-100）
+        
+        心情影响因素：
+        1. 脉动强度（主要）：反映当前生命活力
+        2. 能量水平（次要）：能量太低时心情也会受影响
+        3. 昼夜节律相位差（辅助）：相位偏差大时心情不稳定
+        """
+        # 1. 脉动强度 -> 基础心情（权重60%）
         pulse_intensity = expression.get("pulse_intensity", "中")
-
         intensity_map = {
             "极强": 95,
             "强": 80,
@@ -391,7 +397,40 @@ class LifeAdapter:
             "弱": 40,
             "微弱": 20,
         }
-        mood_value = intensity_map.get(pulse_intensity, 50)
+        base_mood = intensity_map.get(pulse_intensity, 50)
+        
+        # 2. 能量水平影响（权重30%）
+        energy_state = life_states.get("energy", {})
+        energy_value = energy_state.get("energy", 0.5)
+        if energy_value <= 1.0:
+            energy_value = energy_value * 100
+        
+        # 能量低会降低心情
+        energy_mood_factor = 0.0
+        if energy_value < 20:
+            energy_mood_factor = -20  # 非常累，心情很差
+        elif energy_value < 40:
+            energy_mood_factor = -10  # 疲惫，心情低落
+        elif energy_value > 70:
+            energy_mood_factor = 10   # 精力充沛，心情好
+        
+        # 3. 节律相位差影响（权重10%）
+        rhythm_state = life_states.get("rhythm", {})
+        phase_diff = abs(rhythm_state.get("phase_difference", 0))
+        
+        # 相位差大说明生物钟紊乱，心情不稳定
+        rhythm_mood_factor = 0.0
+        if phase_diff > 0.3:  # 相位差>0.3时心情波动
+            rhythm_mood_factor = -15
+        elif phase_diff > 0.2:
+            rhythm_mood_factor = -8
+        
+        # 综合计算
+        mood_value = base_mood + (energy_mood_factor * 0.3) + (rhythm_mood_factor * 0.1)
+        mood_value = max(0, min(100, mood_value))
+        
+        logger.info(f"   🎭 [Mood] base={base_mood}(强度), energy_adj={energy_mood_factor:.1f}, rhythm_adj={rhythm_mood_factor:.1f}, final={mood_value:.1f}")
+        
         return float(mood_value)
 
 
