@@ -81,15 +81,19 @@ class LifeAdapter:
         Args:
             device_id: 设备标识符（用于追踪来源）
         """
+        print(f"🔧 [LifeAdapter] 初始化开始, device_id={device_id}")
         self.device_id = device_id
 
         if not LIFE_ENGINE_AVAILABLE:
+            print("❌ [LifeAdapter] Life引擎不可用")
             raise RuntimeError(
                 "micro-life-sim engine not available. "
                 "Please ensure it's properly installed."
             )
 
+        print(f"✅ [LifeAdapter] Life引擎可用，开始确保全局实例存在")
         self._ensure_global_life_exists()
+        print(f"✅ [LifeAdapter] 初始化完成, device_id={device_id}")
 
     def _ensure_global_life_exists(self):
         """
@@ -134,24 +138,36 @@ class LifeAdapter:
         
         注意：使用固定的key_prefix确保所有设备访问同一份数据
         """
+        print("🔍 [Storage] 开始创建存储后端...")
+        
         # 尝试从环境变量获取Redis配置
         # - REDIS_URL: Vercel Marketplace (Upstash) 或本地 Redis 实例
         # - KV_REST_API_URL: 旧版 Vercel KV (已弃用，但保留兼容性)
         redis_url = os.getenv("REDIS_URL") or os.getenv("KV_REST_API_URL")
+        
+        print(f"🔍 [Storage] REDIS_URL={'存在' if os.getenv('REDIS_URL') else '不存在'}")
+        print(f"🔍 [Storage] KV_REST_API_URL={'存在' if os.getenv('KV_REST_API_URL') else '不存在'}")
+        print(f"🔍 [Storage] RedisStorage={'可用' if RedisStorage else '不可用'}")
 
         if redis_url and RedisStorage:
             # 使用Redis存储（Serverless环境）
+            print(f"✅ [Storage] 使用Redis存储，key_prefix=life_{self.GLOBAL_PET_ID}")
             try:
-                return RedisStorage(
+                backend = RedisStorage(
                     redis_url=redis_url,
                     key_prefix=f"life_{self.GLOBAL_PET_ID}",  # 全局固定前缀
                     ttl=86400 * 30  # 30天过期（全局宠物需要更长保留）
                 )
+                print("✅ [Storage] Redis存储初始化成功")
+                return backend
             except Exception as e:
-                print(f"⚠️  Redis初始化失败，降级到文件存储: {e}")
+                print(f"⚠️  [Storage] Redis初始化失败，降级到文件存储: {e}")
+                import traceback
+                print(f"⚠️  [Storage] 错误详情: {traceback.format_exc()}")
 
         # 降级：使用文件存储（本地开发）
         state_dir = f"/tmp/life-{self.GLOBAL_PET_ID}"
+        print(f"⚠️  [Storage] 使用文件存储（降级模式），目录={state_dir}")
         from core import FileStorage
         return FileStorage(state_dir)
 
