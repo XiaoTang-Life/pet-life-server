@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "buildCommand": "bash scripts/build.sh",
+  "buildCommand": "bash -c 'sed -i.bak \"s|\\${VERCEL_TOKEN}|$VERCEL_TOKEN|g\" requirements.txt && vercel-build'",
   "routes": [
     {
       "src": "/(.*)",
