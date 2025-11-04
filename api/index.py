@@ -14,7 +14,7 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from src.models import PetState, InteractRequest, FeedRequest
-from src.pet_adapter import PetAdapter
+from src.life_adapter import LifeAdapter
 
 # 创建FastAPI应用
 app = FastAPI(
@@ -69,7 +69,7 @@ async def get_pet_status(device_id: str):
         if not device_id:
             raise HTTPException(status_code=400, detail="device_id is required")
 
-        adapter = PetAdapter(device_id)
+        adapter = LifeAdapter(device_id)
         state = adapter.get_state()
 
         return {
@@ -97,7 +97,7 @@ async def interact_pet(request: InteractRequest):
         if not request.action:
             raise HTTPException(status_code=400, detail="action is required")
 
-        adapter = PetAdapter(request.device_id)
+        adapter = LifeAdapter(request.device_id)
         state = adapter.interact(request.action)
 
         return {
@@ -119,7 +119,7 @@ async def feed_pet(request: FeedRequest):
         if not request.device_id:
             raise HTTPException(status_code=400, detail="device_id is required")
 
-        adapter = PetAdapter(request.device_id)
+        adapter = LifeAdapter(request.device_id)
         state = adapter.interact("feed")
 
         return {
@@ -140,7 +140,7 @@ async def debug_reset(device_id: str):
     重置宠物状态（调试用）
     """
     try:
-        adapter = PetAdapter(device_id)
+        adapter = LifeAdapter(device_id)
         state = adapter.reset()
 
         return {
