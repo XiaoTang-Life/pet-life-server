@@ -354,19 +354,29 @@ class LifeAdapter:
     def _extract_energy_value(self, life_states: Dict) -> float:
         """从Life状态提取能量值（0-100）"""
         energy_state = life_states.get("energy", {})
-        # 假设Life内部有energy_level字段
-        value = energy_state.get("energy_level", 50)
+        # Life引擎返回的字段名是 "energy"（不是energy_level）
+        value = energy_state.get("energy", 50)
+        
+        # energy是0-1范围，需要转换为0-100
+        if value <= 1.0:
+            value = value * 100
+        
+        logger.info(f"   📊 [Extract] energy原始值={energy_state.get('energy')}, 映射值={value}")
         return max(0, min(100, float(value)))
 
     def _extract_hunger_value(self, life_states: Dict) -> float:
         """从Life状态提取饥饿值（0-100）"""
-        # 在当前的Life实现中，可能没有直接的hunger字段
-        # 这里作为示例，返回一个计算值
         energy_state = life_states.get("energy", {})
-        energy_level = energy_state.get("energy_level", 50)
+        energy_value = energy_state.get("energy", 0.5)
+        
+        # energy是0-1范围，转换为0-100
+        if energy_value <= 1.0:
+            energy_value = energy_value * 100
 
         # 简化规则：能量低时饥饿高
-        hunger_value = 100 - energy_level
+        hunger_value = 100 - energy_value
+        
+        logger.info(f"   📊 [Extract] energy={energy_value}, hunger计算值={hunger_value}")
         return max(0, min(100, float(hunger_value)))
 
     def _extract_mood_value(self, expression: Dict) -> float:
