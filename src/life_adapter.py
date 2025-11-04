@@ -217,6 +217,51 @@ class LifeAdapter:
             全局共享的Life实例
         """
         return self.__class__._global_life
+    
+    def _tick_life_engine(self, life: Life):
+        """
+        推进Life引擎的时间
+        
+        在Serverless环境中，没有后台进程持续运行tick。
+        因此每次请求时，需要根据距离上次更新的时间来补充tick。
+        
+        策略：
+        - 记录上次tick的时间
+        - 计算时间差
+        - 执行相应数量的tick（每秒1个tick）
+        """
+        now = datetime.utcnow()
+        
+        # 从类变量获取上次tick时间
+        last_tick_time = self.__class__._global_metadata.get("last_tick_time")
+        
+        if last_tick_time:
+            # 计算时间差（秒）
+            last_tick_dt = datetime.fromisoformat(last_tick_time)
+            elapsed_seconds = (now - last_tick_dt).total_seconds()
+            
+            # 限制最大补偿时间（避免一次性tick太多次）
+            # 最多补偿1小时的tick
+            elapsed_seconds = min(elapsed_seconds, 3600)
+            
+            if elapsed_seconds >= 1.0:
+                # 执行tick（每秒1个）
+                tick_count = int(elapsed_seconds)
+                logger.info(f"⏰ [Life] 补偿 {tick_count} 个tick（距离上次 {elapsed_seconds:.1f}秒）")
+                
+                for _ in range(tick_count):
+                    life.tick(dt=1.0)
+                
+                # 手动刷盘（延迟刷盘模式）
+                if not life.state_manager.auto_flush:
+                    life.flush()
+                
+                # 更新上次tick时间
+                self.__class__._global_metadata["last_tick_time"] = now.isoformat()
+        else:
+            # 首次tick，只记录时间
+            logger.info("⏰ [Life] 首次tick，初始化时间戳")
+            self.__class__._global_metadata["last_tick_time"] = now.isoformat()
 
     def get_state(self) -> Dict[str, Any]:
         """
@@ -229,6 +274,10 @@ class LifeAdapter:
             包含全局共享数值的字典
         """
         life = self.get_life()
+        
+        # 🔥 关键：在Serverless环境中，每次请求时推进Life引擎
+        # 计算距离上次更新的时间，执行相应数量的tick
+        self._tick_life_engine(life)
 
         # 获取Life的内在状态
         life_states = life.get_states()
