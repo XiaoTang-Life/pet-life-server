@@ -151,7 +151,9 @@ class LifeAdapter:
                     life_instance = Life(
                         backend=backend,
                         time_scale=1.0,  # 正常速度
-                        auto_flush=False  # 使用延迟刷盘优化性能
+                        auto_flush=False,  # 使用延迟刷盘优化性能
+                        internal_period_hours=10.0,  # 10小时生物钟周期
+                        external_period_hours=10.0  # 10小时环境周期
                     )
 
                     # 启动Life实例
